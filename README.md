@@ -55,9 +55,9 @@ cf) mvn install:install-file -DgroupId=com.oracle -DartifactId=ojdbc6 -Dversion=
 
 > src/static 
 
-> html, css 같은 정적 파일을 모아놓은 디렉터리입니다.
+ html, css 같은 정적 파일을 모아놓은 디렉터리입니다.
 
- src/template
+> src/template
 
-> JSP같은 동적으로 값이 변환되는 파일을 모아놓은 디렉터리 입니다.
+ JSP같은 동적으로 값이 변환되는 파일을 모아놓은 디렉터리 입니다.
 
