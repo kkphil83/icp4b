@@ -1,0 +1,31 @@
+// K8S ingress, service, deploy
+def label = "daishin-${UUID.randomUUID().toString()}"
+
+def DOCKER_REGISTRY = 'mycluster.icp:8500'
+def DOCKER_IMAGE = 'red/samstore' //harbor project name
+def IMAGE_VERSION = new Date().format('yyyyMMdd-HHmmss')
+def REGISTRY_CREDENTIALS = 'registry_credential'
+def K8S_NAMESPACE='red'
+
+podTemplate(label : label,
+    namespace: 'cicd',
+    containers: [
+        containerTemplate(name: 'kubectl', image: 'mycluster.icp:8500/cicd/k8s-kubectl:latest', ttyEnabled: true, command: 'cat')
+    ]){
+    
+    node(label) {
+        stage('SOURCE CHECKOUT') {
+            def repo = checkout scm
+        }
+ 
+        stage('K8S Deploy') {
+            container('kubectl') {
+                sh "kubectl apply -f k8s/ingress.yaml -n ${K8S_NAMESPACE}"
+                sh "kubectl apply -f k8s/service.yaml -n ${K8S_NAMESPACE}"
+                sh "kubectl apply -f k8s/deploy.yaml -n ${K8S_NAMESPACE}"
+            }
+
+        }
+        
+    }
+}

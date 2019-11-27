@@ -1,0 +1,58 @@
+//def label = "jenkins-${UUID.randomUUID().toString()}"
+ 
+def ZCP_USERID = 'dshin' //console ID
+def DOCKER_REGISTRY = 'mycluster.icp:8500'
+def DOCKER_IMAGE = 'red/test-image' //harbor project name
+def K8S_NAMESPACE = 'red' 
+def IMAGE_VERSION = new Date().format("yyMMdd.HHmm", TimeZone.getTimeZone('UTC'))
+def REGISTRY_CREDENTIALS = 'registry_credential'
+def DEPLOYMENT_NAME = 'red-cicd'
+def NEW_IMAGE_DIGEST = ''
+ 
+podTemplate(label : 'daishin',
+    namespace: 'cicd',
+    containers: [
+        containerTemplate(name: 'maven', image: 'mycluster.icp:8500/cicd/maven:3.5.2-jdk-8-alpine', ttyEnabled: true, command: 'cat'),
+        containerTemplate(name: 'docker', image: 'mycluster.icp:8500/cicd/docker:latest', ttyEnabled: true, command: 'cat'),
+        containerTemplate(name: 'kubectl', image: 'mycluster.icp:8500/cicd/k8s-kubectl:latest', ttyEnabled: true, command: 'cat')
+    ],
+    volumes: [
+        hostPathVolume(hostPath: '/var/run/docker.sock', mountPath: '/var/run/docker.sock'),
+        persistentVolumeClaim(mountPath: '/root/.m2', claimName: 'localrepo-pvc')
+    ]) {
+ 
+    node('daishin') {
+        stage('SOURCE CHECKOUT') {
+            def repo = checkout scm
+        }
+ 
+        stage('BUILD MAVEN') {
+            container('maven') {
+                sh 'mvn clean package -DskipTest -Dmaven.repo.local=/root/.m2'
+            }
+        }
+ 
+        stage('BUILD DOCKER IMAGE') {
+            container('docker') {
+                //TODO: Docker image build block
+                def build = docker.build(DOCKER_REGISTRY + "/" + DOCKER_IMAGE + ":" + IMAGE_VERSION, ".")
+                docker.withRegistry("https://" + DOCKER_REGISTRY, REGISTRY_CREDENTIALS) {
+                    build.push()
+                }
+                // save image digest
+                NEW_IMAGE_DIGEST = sh (
+                    script: 'docker inspect --format=\'{{index .RepoDigests 0}}\' ' + DOCKER_REGISTRY + '/' + DOCKER_IMAGE + ':' + IMAGE_VERSION,
+                    returnStdout: true
+                ).trim()
+            }
+        }
+ 
+        stage('DEPLOY') {
+            container('kubectl') {
+                //TODO: kubectl command block
+                // deploy service, ingress, deployment
+                sh 'kubectl set image deployment ' + DEPLOYMENT_NAME + ' ' + DEPLOYMENT_NAME + '=' + NEW_IMAGE_DIGEST + ' -n ' + K8S_NAMESPACE 
+            }
+        }
+    }
+}
